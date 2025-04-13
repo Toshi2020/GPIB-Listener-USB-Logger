@@ -16,7 +16,8 @@
 ・ソフトウェアは当初こちらを参考に結線してコードを焼いてみたのですが、私の用途ではPC側からの機器の制御は不要なので、リッスンオンリーとしたコードに作り直しました。そのため未使用の配線も残っていますが未結線にしておけばOKです。  
 >gpib-conv-arduino-nano  
 https://github.com/JacekGreniger/gpib-conv-arduino-nano  
-  
+
+・参考までにGPIBコネクタのピン配です。  
 ![GPIBpin](https://github.com/user-attachments/assets/c07e5797-d3c2-43d8-928c-c24af66da4ae)
 
 ・GPIBコネクタとArduinoNANOの結線はソースに記述してあります。(記述してませんがGNDも忘れずに)  
@@ -32,7 +33,7 @@ https://github.com/JacekGreniger/gpib-conv-arduino-nano
 
   
 **●PC側ロガーアプリ**  
-・ブラウザで実行するアプリです。サーバーを使っているわけではなくローカルPCで動くのですが、フォントやアイコンやチャート機能の読み込みなどがあるので実行にはネット接続が必要です。
+・ブラウザで実行するアプリです。サーバーを使っているわけではなくローカルPCで動くのですが、フォントやアイコンやチャート機能の読み込みなどがあるので実行にはネット接続が必要です。  
 ・次に示すのはリチウムイオン電池を3.7Ωの抵抗で放電した時の端子電圧の推移です。  
 ![Li Disccharge3](https://github.com/user-attachments/assets/0a7a33dc-4ccc-4745-b544-76d1073ebc3a)
 
