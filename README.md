@@ -22,7 +22,8 @@ https://github.com/JacekGreniger/gpib-conv-arduino-nano
 
 ・GPIBコネクタとArduinoNANOの結線はソースに記述してあります。(記述してませんがGNDも忘れずに)  
   
-![GPIBunit](https://github.com/user-attachments/assets/cb5db0dc-12ff-4439-adcd-63057266106e)
+![GPIBunit](https://github.com/user-attachments/assets/79190e6d-0ab2-41da-a326-75b00f1ea93c)
+
 
 ・GPIB用コネクタは、手持ちのジャンクからセントロニクスプリンタ用36pinフラットケーブルタイプをばらして24pinを作成しました。  
 ・Arduino NANOも手持ちの古いマイクロBタイプを使いました。もちろんType-Cの物でもOKでしょうが、ケースの穴位置の多少の修正が必要かもしれません。
