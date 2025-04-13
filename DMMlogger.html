@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="ja">
+<!--
+******************************************************************************
+*
+*	DMMlogger.html -- DMMから受け取ったデータのロギング
+*
+*	rev1.0	2025/04/11	initial revision by	Toshi
+*
+******************************************************************************
+-->
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0,maximum-scale=1.0, user-scalable=no" >
+	<title>DMM Logger</title>
+	<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+	<script src="https://unpkg.com/lucide@latest"></script>
+	<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+
+</head>
+
+<style>
+/* CSSのコメントには//は使えない */
+body {
+	margin: 0;
+	height: 100vh;
+	font-family: Arial, sans-serif;
+}
+#ui-area {
+	height: 90px;
+	background: #ffffc0;
+	padding: 10px;
+	box-sizing: border-box;
+	display: flex;
+}
+#graph-area {
+	flex-grow: 1;
+	padding: 10px;
+}
+#com-ctrl {
+	width: 100px;
+	margin-right: 5px;
+	height: 100%;
+}
+#connect {
+	width: 100%;
+	height: 50%;
+}
+#disconnect {
+	width: 100%;
+	height: 50%;
+}
+#dmm {
+	width: 220px;
+	margin: 0;
+	height: 100%;
+	background-color: black;
+	color: white;
+	position: relative;
+	display: flex;
+	align-items: center;
+	padding: 5px;
+	box-sizing: border-box;
+}
+#numeric {
+	color: red;
+	font-size: 36px;
+	flex-grow: 1;
+	font-family: 'Share Tech Mono', monospace;
+	white-space: nowrap;
+	padding-right: 5px;
+	text-align: right;
+}
+#mode {
+	position: absolute;
+	top: 2px;
+	right: 5px;
+	font-size: 14px;
+	padding-right: 5px;
+}
+#unit {
+	position: absolute;
+	bottom: 2px;
+	right: 5px;
+	font-size: 14px;
+	padding-right: 5px;
+}
+#ctrl {
+	width: 220px;
+	height: 100%;
+	padding-left: 5px;
+	display: flex;
+	justify-content: space-between;
+	align-items: center; /* ← これでボタンの高さ位置を中央に揃える */
+}
+#ctrl button {
+	width: 33%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-family: Arial, sans-serif;
+}
+#record {
+	color: red;
+	height: 100%;
+	font-size: 24px;
+	padding-bottom: 5px;
+}
+/* disabled時の色指定 */
+#record:disabled {
+	color: #ffaaaa;
+}
+#stop {
+	height: 100%;
+	font-size: 40px;
+	padding-bottom: 8px;
+}
+#save {
+	height: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0;
+	margin-left: 5px;
+}
+#save svg {
+	width: 24px;
+	height: 64px;
+}
+#record-settings {
+	display: flex;
+	flex-direction: column;
+	justify-content: flex-start;
+	align-items: flex-start;
+	font-size: 14px;
+	line-height: 1.6;
+	margin-left: 10px;
+}
+#record-settings label {
+	display: flex;
+	justify-content: space-between; /* ラベルとselectの間を自動調整 */
+	align-items: center;
+	width: 100%;
+}
+#record-settings select {
+	width: 100px;
+	text-align: center;
+}
+#record-stat {
+	margin-top: 1em;
+	padding-top: 10px;
+	display: flex;
+	flex-direction: column;
+	justify-content: flex-start;
+	align-items: flex-start;
+	font-size: 14px;
+	line-height: 1.6;
+	margin-left: 20px;
+}
+#ctrl button,
+#connect,
+#disconnect,
+#save {
+	background-color: #f0f0f0;
+	border: 1px solid #aaa;
+	border-radius: 4px;
+	box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+	cursor: pointer;
+	transition: box-shadow 0.1s ease, transform 0.1s ease;
+}
+/* 押したとき */
+#ctrl button:active,
+#connect:active,
+#disconnect:active,
+#save:active {
+	box-shadow: inset 2px 2px 4px rgba(0, 0, 0, 0.3);
+	transform: translateY(1px);
+}
+/* disabled状態のボタンカラー変更 */
+#ctrl button:disabled,
+#connect:disabled,
+#disconnect:disabled,
+#save:disabled {
+	background-color: #d0d0d0;/* 少し暗いグレー */
+}
+</style>
+<body>
+	<div id="ui-area">
+		<div id="com-ctrl">
+			<button id="connect" title="COM接続">
+				<i data-lucide="plug"></i>
+			</button>
+			<button id="disconnect" title="COM切断" disabled>
+				<i data-lucide="unplug"></i>
+			</button>
+		</div>
+		<div id="dmm">
+			<div id="numeric"></div>
+			<div id="mode">DMM</div>
+			<div id="unit"></div>
+		</div>
+		<div id="ctrl">
+			<button id="record" title="ログ開始" disabled>▶</button>
+			<button id="stop" title="ログ終了" disabled>■</button>
+			<button id="save" title="セーブ" disabled><i data-lucide="save"></i></button>
+
+		</div>
+
+		<div id="record-settings">
+			<label>インターバル [s]：
+				<select id="interval">
+					<option>0.2</option>
+					<option>1</option>
+					<option>2</option>
+					<option>5</option>
+					<option>10</option>
+					<option>30</option>
+					<option>60</option>
+					<option>180</option>
+					<option>300</option>
+					<option>600</option>
+				</select>
+			</label>
+			<label>最大データ数：
+				<select id="max-count">
+					<option>100</option>
+					<option>500</option>
+					<option>1000</option>
+					<option>2000</option>
+					<option>5000</option>
+					<option>10000</option>
+				</select>
+			</label>
+			<label id="total-time-label">トータル記録時間：
+				<span id="total-time"></span>
+			</label>
+		</div>
+		<div id="record-stat">
+			<label id="count">カウント：</label>
+			<label id="elapse">経過時間：</label>
+		</div>
+	</div>
+	<div id="graph-area">
+		<canvas id="chart"></canvas>
+	</div>
+<script>
+//----------------------------------------------------------------------------
+$(function () {
+
+	const RXINTERVAL = 0.2;	// GPIBデータ受信間隔[s]
+	let LogInterval;	// ログ記録間隔
+	let LogCount;		// ログ記録カウント
+	let RxStr;
+	let LogData = [];
+	let LogIndex;
+	let fRxOk;
+	let ComPort = null;
+	let reader = null;
+	let inputDone = null;
+	let fLogging = false;
+	let ModeStr = "DMM";
+	let UnitStr = "";
+	let FileName = "";
+	let StartTime = null;
+	let EndTime = null;
+	let chart = null;	// グラフのインスタンス
+	let MaxCount;
+	let Exponent = 0;
+	let DecimalPlaces = 3;
+
+	// アイコン作成
+	lucide.createIcons();
+
+	// グラフを初期化
+	initChart();
+
+	// 起動時に保存値を読み込んで設定
+	const savedInterval = localStorage.getItem("dmm-interval");
+	const savedMaxCount = localStorage.getItem("dmm-max-count");
+
+	if (savedInterval) {
+		$("#interval").val(savedInterval);
+	}
+	if (savedMaxCount) {
+		$("#max-count").val(savedMaxCount);
+	}
+	UpdateTotalTime();
+
+	// CONNECTボタンのクリック
+	$("#connect").click(function() {
+		OnConnect();	// CONNECTボタンのクリック時
+	});
+	// DISCONNECTボタンのクリック
+	$("#disconnect").click(function() {
+		OnDisConnect();	// DISCONNECTボタンのクリック時
+	});
+	// インターバル変更
+	$("#interval").on("change", function () {
+		OnIntervalChanged();	// インターバル変更時
+	});
+	// 最大データ数変更
+	$("#max-count").on("change", function () {
+		OnMaxCountChanged();	// 最大データ数変更時
+	});
+	// RECORDボタンのクリック
+	$("#record").click(function() {
+		OnRecord();	// RECORDボタンのクリック時
+	});
+	// STOPボタンのクリック
+	$("#stop").click(function() {
+		OnStop();	// STOPボタンのクリック時
+	});
+	// SAVEボタンのクリック
+	$("#save").click(function() {
+		OnSave();	// SAVEボタンのクリック時
+	});
+
+	// ブラウザ終了・リロード前
+	window.addEventListener("beforeunload", async (event) => {
+		if (fLogging) {	// ロギング中なら
+			event.preventDefault();	// 本当に終わっていいか確認を取る
+			event.returnValue = "";
+			return;
+		}
+		OnDisConnect();	// 受信ループを止めてポートを閉じる(努力をする)
+	});
+
+// 時刻をhh:mm:ss形式にフォーマット
+function formatDate(date, includeDate = true) {
+	const pad = (n) => n < 10 ? "0" + n : n;
+	const yy = date.getFullYear().toString().slice(-2);	// 年の下2桁
+	const mm = pad(date.getMonth() + 1);	// 月
+	const dd = pad(date.getDate());	// 日
+	const hh = pad(date.getHours());	// 時
+	const min = pad(date.getMinutes());	// 分
+	const ss = pad(date.getSeconds());	// 秒
+
+	if (includeDate) {
+		// 年、月、日を含む形式
+		return `${yy}${mm}${dd}_${hh}${min}${ss}`;
+	} else {
+		// 時間だけの形式（年月日なし）
+		return `${hh}${min}${ss}`;
+	}
+}
+// CONNECTボタンのクリック時受信ループを止めてポートを閉じる
+async function OnConnect() {
+	if (!("serial" in navigator)) {
+		alert("このブラウザはWeb Serial APIに対応していません。\n"+
+		"Chrome または Edge を使用してください。");
+		return;
+	}
+	try {
+		// 以前のポートが開いていた場合は閉じる
+		OnDisConnect();
+
+		// COMポートのオープンをリクエスト
+		const port = await navigator.serial.requestPort();
+
+		await port.open({ baudRate: 115200, dataBits: 8, stopBits: 1 });
+		ComPort = port;  // 成功した場合のみセット
+		console.log("COMポート確定:", port);
+
+		document.getElementById("connect").disabled = true;
+		document.getElementById("disconnect").disabled = false;
+
+		// 読み取り開始
+		StartReadLoop();
+
+	} catch (error) {
+		// Cancelの場合はエラー処理しない
+		if (error.name === "AbortError" ||
+			error.name === "NotFoundError") {
+			console.log("ポート選択がキャンセルされました。");
+		} else {
+			// 失敗時に COMポートを確実にリセット
+			OnDisConnect();
+			console.error("COMポートのオープンに失敗しました:", error);
+			alert("COMポートのオープンに失敗しました。\n" + error.message +
+				"\n再試行するか、ページをリロードしてください。");
+		}
+	}
+}
+// DISCONNECTボタンのクリック時
+async function OnDisConnect() {
+	if (reader) {
+		try {
+			await reader.cancel();	// 読み取りループを停止
+		} catch (e) {
+			console.warn("reader.cancel エラー:", e);
+		}
+	}
+	if (inputDone) {
+		try {
+			await inputDone;
+		} catch (e) {
+			// pipeTo が中断された場合はエラーになるが、無視してよい
+			if (e && e.name !== "AbortError") {
+				console.warn("inputDone エラー:", e);
+			}		}
+		inputDone = null;
+	}
+
+	if (ComPort) {
+		try {
+			await ComPort.close();
+		} catch (closeError) {
+			console.warn("COMポートのクローズに失敗:", closeError);
+		}
+		ComPort = null;
+	}
+
+	document.getElementById("connect").disabled = false;
+	document.getElementById("disconnect").disabled = true;
+	document.getElementById("record").disabled = true;
+}
+// インターバルとデータポイントから相記録時間を計算
+function UpdateTotalTime() {
+	const interval = parseFloat($("#interval").val());
+	MaxCount = parseInt($("#max-count").val(), 10);
+	const totalSeconds = interval * MaxCount;
+
+	let remaining = Math.floor(totalSeconds);
+	const hours = Math.floor(remaining / 3600);
+	remaining %= 3600;
+	const minutes = Math.floor(remaining / 60);
+	const seconds = remaining % 60;
+
+	let display = "";
+	if (hours > 0) display += `${hours}時間`;
+	if (minutes > 0 || hours > 0) display += `${minutes}分`;
+	display += `${seconds}秒`;
+
+	$("#total-time").text(display);
+}
+// 記録開始からの経過時間を表示
+function UpdateElapseTime() {
+	if (!StartTime) return;
+
+	const now = new Date();
+	let elapsedMs = now - StartTime;
+	let elapsedSec = Math.floor(elapsedMs / 1000);
+	const hours = Math.floor(elapsedSec / 3600);
+	elapsedSec %= 3600;
+	const minutes = Math.floor(elapsedSec / 60);
+	const seconds = elapsedSec % 60;
+
+	let display = "";
+
+	if (hours > 0) {
+		display += `${hours}時間`;
+	}
+	if (minutes > 0 || hours > 0) {
+		display += `${minutes}分`;
+	}
+	display += `${seconds}秒`;
+
+	$("#elapse").text("経過時間：" + display);
+}
+
+// インターバル変更時
+function OnIntervalChanged() {
+	localStorage.setItem("dmm-interval", $("#interval").val());
+	UpdateTotalTime();
+	// 新しいインターバルでのロギング間隔を再計算
+	LogInterval = parseFloat($("#interval").val()) / RXINTERVAL;
+}
+// 最大データ数変更時
+function OnMaxCountChanged() {
+	localStorage.setItem("dmm-max-count", $("#max-count").val());
+	UpdateTotalTime();
+	MaxCount = parseInt($("#max-count").val(), 10);
+}
+// RECORDボタンのクリック時
+function OnRecord() {
+	if (fRxOk) {
+		fLogging = true;
+		document.getElementById("record").disabled = true;
+		document.getElementById("stop").disabled = false;
+		document.getElementById("interval").disabled = true;
+		document.getElementById("max-count").disabled = true;
+		document.getElementById("save").disabled = true;
+
+		// ログ開始時刻を取得
+		StartTime = new Date();
+
+		// LogIntervalを設定し、ロギング開始
+		LogInterval = parseFloat($("#interval").val()) / RXINTERVAL;
+		LogIndex = 0;  // ログを開始する前にインデックスをリセット
+		LogCount = 0;
+		LogData = [];
+		// グラフの初期化
+		if (chart) {
+			// すでにchartが存在している場合、データをリセット
+			chart.data.labels = [];
+			chart.data.datasets[0].data = [];
+
+			let title;
+			if (ModeStr != "DMM") {
+				title = ModeStr + "[" + UnitStr + "]";
+			} else {
+				title = "value";
+			}
+			// モードに基づいてタイトルを設定
+			chart.options.plugins.title.text = title;	// タイトル更新
+			chart.update();  // タイトル変更を反映
+		}
+	}
+}
+// STOPボタンのクリック時
+function OnStop() {
+	fLogging = false;
+	if (fRxOk) {
+		document.getElementById("record").disabled = false;
+		document.getElementById("save").disabled = false;
+		// ログ終了時刻を取得
+		EndTime = new Date();
+	}
+	document.getElementById("stop").disabled = true;
+	if (LogData.length > 0) {
+		document.getElementById("save").disabled = false;
+	}
+	document.getElementById("interval").disabled = false;
+	document.getElementById("max-count").disabled = false;
+}
+// SAVEボタンのクリック時
+function OnSave() {
+	if (!LogIndex) {
+		alert("保存するデータがありません");
+		return;
+	}
+	// 開始時刻と終了時刻をフォーマット
+	const startFormatted = formatDate(StartTime);
+	const endFormatted = formatDate(EndTime, false);  // EndTimeでは年月日不要
+
+	// CSVのファイル名を作成
+	const fileName = `${ModeStr}${startFormatted}-${endFormatted}.csv`;
+
+	// csvContentを作成
+	let csvContent;
+	if (UnitStr != "") {
+		csvContent = "Time[s]," + ModeStr + "[" + UnitStr +"]\n";
+	} else {
+		csvContent = "Time[s],value\n";
+	}
+	let tic = parseFloat($("#interval").val());
+	for (let i = 0; i < LogData.length; i++) {
+		csvContent += `${(i * tic).toFixed(1)},${LogData[i]}\n`;
+	}
+
+	const blob = new Blob([csvContent], { type: "text/csv" });
+	const a = document.createElement("a");
+	a.href = URL.createObjectURL(blob);
+	a.download = fileName;	// ファイル名
+	document.body.appendChild(a);
+	a.click();
+	document.body.removeChild(a);
+}
+// 受信ループ
+async function StartReadLoop() {
+	if (!ComPort) return;
+
+	const decoder = new TextDecoderStream();
+	inputDone = ComPort.readable.pipeTo(decoder.writable);
+	const inputStream = decoder.readable;
+	reader = inputStream.getReader();
+	let buffer = "";
+
+	try {
+		while (true) {
+			const { value, done } = await reader.read();
+			if (done) break;
+			if (value) {
+				buffer += value;
+				let index;
+				while ((index = buffer.indexOf("\n")) !== -1) {
+					const line = buffer.slice(0, index).trim();
+					buffer = buffer.slice(index + 1);
+
+					if (!line) continue;
+
+					let c = line[0];
+					if (c === ' ' || c === '-' || c === '+' ||
+						(c >= '0' && c <= '9')) {
+					
+						ModeStr = "DMM";	// 数値なら
+						RxStr = line;		// データ全体をRxStrに
+					} else {
+						ModeStr = line.slice(0, 3);	// 最初の3文字をModeStrに
+						RxStr = line.slice(3);		// 残りをRxStrに
+					}
+					// RxStrに含まれる指数部を調べる
+					const match =
+						RxStr.match(/^([ +-]?\d*\.?\d+)e([+-]?\d+)$/i);
+					if (match) {
+						DecimalPlaces =
+							match[1].split('.')[1] ?
+								match[1].split('.')[1].length : 0;
+						Exponent = parseInt(match[2], 10);
+					} else {
+						DecimalPlaces = 1;
+						Exponent = 3;
+					}
+
+					// UnitStrを設定
+					const mode2 = ModeStr.slice(0, 2);
+					const mode1 = ModeStr.slice(0, 1);
+
+					if (mode2 === "DV" || mode2 === "AV") {
+						UnitStr = "V";
+					} else if (mode2 === "DI" || mode2 === "AI") {
+						UnitStr = "A";
+					} else if (mode1 === "R") {
+						UnitStr = "Ω";
+					} else if (mode2 === "TC") {
+						UnitStr = "℃";
+					} else {
+						UnitStr = "";
+					}
+					// モードと値と単位を表示
+					$("#mode").text(ModeStr);
+					$("#numeric").text(RxStr);
+					$("#unit").text(UnitStr);
+					
+					fRxOk = true;	// 受信している
+					// ログ要求中でなければ
+					if (!fLogging) {
+						// RECORDボタンをイネイブルに
+						document.getElementById("record").disabled = false;
+					}
+					// ログ要求中でログのタイミングなら
+					if (fLogging && LogCount === 0) {
+						// データをLogDataに追加
+						LogData.push(RxStr);
+						$("#count").text("カウント：" + (LogIndex + 1));
+						UpdateElapseTime();
+						LogIndex++;
+						// LogDataが更新されるたびにグラフを更新
+						updateChart();
+					}
+					// 規定回数経過したら
+					if (++LogCount >= LogInterval) {
+						LogCount = 0;	// 次回サンプルでロギング
+					}
+					// 最大データ数に達したら
+					if (LogIndex >= MaxCount) {
+						OnStop();	// ロギングを停止
+					}
+				}
+			}
+		}
+	} catch (err) {
+		if (err.name !== "TypeError") {
+			console.error("読み取りエラー:", err);
+		}
+	} finally {
+		reader.releaseLock();
+		reader = null;
+	}
+}
+// DMMと同じような指数表記を得る
+function formatScientific(value) {
+	if (typeof value !== "number" || isNaN(value)) return "0";
+
+	// 値を指定した指数でスケーリング
+	const scaled = value * Math.pow(10, -Exponent);
+	// 指数部の符号を整えて表示（E+z形式）
+	const expStr = (Exponent >= 0 ? "+" : "") + Exponent;
+	return scaled.toFixed(DecimalPlaces) + "E" + expStr;
+}
+// グラフの初期化
+function initChart() {
+	const ctx = document.getElementById('chart').getContext('2d');
+	let label = "DMM value";  // 初期ラベル
+
+	chart = new Chart(ctx, {
+		type: 'line',  // 折れ線グラフ
+		data: {
+			labels: [],  // 時間のラベル
+			datasets: [{
+				label: label,  // データのラベル
+				data: [],  // グラフに表示するデータ
+				borderColor: 'rgba(0, 0, 200, 1)',
+				borderWidth: 1,	// 線の太さ
+				pointRadius: 1, // データポイントのマーカーサイズ
+				fill: false,
+			}]
+		},
+		options: {
+			responsive: true,
+			plugins: {
+				title: {
+					display: true,
+					text: label,  // ここでタイトルを設定
+				},
+				legend: {
+					display: false	// 凡例を非表示
+				},
+				tooltip: {
+					enabled: true,
+					callbacks: {
+						label: function(context) {
+							return formatScientific(context.raw.y);
+						}
+					}
+				}
+			},
+			scales: {
+				x: {
+					type: 'linear',
+					position: 'bottom',
+			        title: {
+			          display: true,
+			          text: 'Time[s]'
+			        },
+				},
+				y: {
+					beginAtZero: false,
+					ticks: {
+						callback: function(value, index, ticks) {
+							return formatScientific(value);
+						}
+					}
+				}
+			}
+		}
+	});
+}
+// グラフデータの更新
+function updateChart() {
+	if (chart) {
+		chart.data.labels = [];  // 時間のラベルをリセット
+		chart.data.datasets[0].data = [];  // データをリセット
+
+		// LogDataに基づいてグラフを更新
+		const tic = parseFloat($("#interval").val());
+		for (let i = 0; i < LogData.length; i++) {
+			const time = i * tic;
+			const value = LogData[i];
+			chart.data.labels.push(time);  // 時間ラベル
+			chart.data.datasets[0].data.push(
+					{ x: time, y: parseFloat(value) });  // データ点
+		}
+
+		chart.update();  // グラフを更新
+	}
+}
+
+//----------------------------------------------------------------------------
+});
+</script>
+</body>
+</html>
